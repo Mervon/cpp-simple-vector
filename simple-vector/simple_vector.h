@@ -28,11 +28,9 @@ public:
 
     // Создаёт вектор из size элементов, инициализированных значением value
     SimpleVector(size_t size, const Type& value) : array_(size)  {
-        for (int i = 0; i < static_cast<int>(size); ++i) {
-            array_[i] = value;
-            capacity_ = size;
-            size_ = size;
-        }
+        capacity_ = size;
+        size_ = size;
+        std::fill(begin(), end(), Type(value));
     }
     
     SimpleVector(size_t size, Type&& value) : array_(new Type[size]{}) {
@@ -43,10 +41,7 @@ public:
 
     // Создаёт вектор из std::initializer_list
     SimpleVector(std::initializer_list<Type> init) : SimpleVector(init.size()) {
-        auto init_begin = init.begin();
-        for (int i = 0; i < static_cast<int>(init.size()); ++i, ++init_begin) {
-            array_[i] = *init_begin;
-        }
+        std::copy(init.begin(), init.end(), begin());
     }
     
     SimpleVector(ReserveProxyObj objc) {
@@ -65,16 +60,18 @@ public:
 
     // Сообщает, пустой ли массив
     bool IsEmpty() const noexcept {
-        return !size_;
+        return 0 == size_;
     }
 
     // Возвращает ссылку на элемент с индексом index
     Type& operator[](size_t index) noexcept {
+        assert(index < size_);
         return array_[index];
     }
 
     // Возвращает константную ссылку на элемент с индексом index
     const Type& operator[](size_t index) const noexcept {
+        assert(index < size_);
         return array_[index];
     }
 
@@ -181,19 +178,15 @@ public:
     }
 
     SimpleVector(SimpleVector&& other) {  
-        SimpleVector<Type> tmp(other.GetSize());
-        int count = 0;
-        
-        for (auto& item : other) {
-            tmp[count++] = std::move(item);
-        }
-        
-        swap(tmp);
-        
-        while (other.GetSize() != 0) {
-            other.PopBack();
-        }
+    Reserve(other.GetSize()); 
+    size_ = other.GetSize();
+    
+    std::move_backward(std::make_move_iterator(other.begin()), std::make_move_iterator(other.end()), end()); //по факту без временного вектора мы не обошлись, он создался в методе Reserve() в 181 строке, так что здесь идентичное кол-во созданий нового вектора, да и std::move_backward всё что делает так это проходится по итераторам от начала и до конца в точно таком же цикле что был раньше, и еденственное что мы получили с этого нововведения - это читабельность кода (было 3 строки, а стало 1), или быть может я что то не правильно понимаю?
+
+    while (other.GetSize() != 0) {
+        other.PopBack();
     }
+}
 
     SimpleVector& operator=(const SimpleVector& rhs) {
         if (this != &rhs) {
@@ -280,6 +273,7 @@ public:
     // вместимость вектора должна увеличиться вдвое, а для вектора вместимостью 0 стать равной 1
     Iterator Insert(ConstIterator pos, const Type& value) {
         size_t pos_size_t = std::distance(begin(), Iterator(pos));
+        assert(pos_size_t <= size_);
         auto pos_size_t_end = std::distance(begin(), end());
         if (size_ == capacity_) {
             if (size_ == 0) {
@@ -307,6 +301,7 @@ public:
     
     Iterator Insert(ConstIterator pos, Type&& value) {
         size_t pos_size_t = std::distance(begin(), Iterator(pos));
+        assert(pos_size_t <= size_);
         auto pos_size_t_end = std::distance(begin(), end());
         if (size_ == capacity_) {
             if (size_ == 0) {
@@ -326,11 +321,11 @@ public:
                 ArrayPtr<Type> buff(capacity_);
                 std::copy(std::make_move_iterator(begin()), std::make_move_iterator(Iterator(pos)), buff.Get());
                 buff[pos_size_t] = std::move(value);
-                std::copy_backward(std::make_move_iterator(Iterator(pos)), std::make_move_iterator(end()), buff.Get() + pos_size_t_end + 1);
+                std::move_backward(std::make_move_iterator(Iterator(pos)), std::make_move_iterator(end()), buff.Get() + pos_size_t_end + 1);
                 array_.swap(buff);
             }
         } else {
-            std::copy_backward(std::make_move_iterator(Iterator(pos)), std::make_move_iterator(end()), end() + 1);
+            std::move_backward(std::make_move_iterator(Iterator(pos)), std::make_move_iterator(end()), end() + 1);
             array_[pos_size_t] = std::move(value);
         }
         ++size_;
@@ -339,14 +334,14 @@ public:
 
     // "Удаляет" последний элемент вектора. Вектор не должен быть пустым
     void PopBack() noexcept {
-        if (size_ != 0) {
-            --size_;
-        }
+        assert(size_ != 0);
+        --size_;
     }
 
     // Удаляет элемент вектора в указанной позиции
     Iterator Erase(ConstIterator pos) {
         size_t pos_size_t = pos - this->begin();
+        assert(pos_size_t <= size_);
         size_t end = this->end() - this->begin();
         for (; (pos_size_t + 1) != end; ++pos_size_t) {
             array_[pos_size_t] = std::move(array_[pos_size_t + 1]);
@@ -365,8 +360,9 @@ public:
     void Reserve(size_t new_capacity) {
         if (new_capacity > capacity_) {
             ArrayPtr<Type> tmp_array{new_capacity};
-            std::copy(array_.Get(), array_.Get() + size_, tmp_array.Get());
+            std::move(std::make_move_iterator(array_.Get()), std::make_move_iterator(array_.Get() + size_), tmp_array.Get());
             array_.swap(tmp_array);
+            
             capacity_ = new_capacity;
         }
     }

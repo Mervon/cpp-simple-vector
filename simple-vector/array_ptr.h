@@ -30,6 +30,10 @@ public:
 
     // Запрещаем копирование
     ArrayPtr(const ArrayPtr&) = delete;
+    
+    ArrayPtr(ArrayPtr&& other) {
+        raw_ptr_ = move(other.Get());
+    }
 
     ~ArrayPtr() {
         delete[] raw_ptr_;
@@ -37,6 +41,11 @@ public:
 
     // Запрещаем присваивание
     ArrayPtr& operator=(const ArrayPtr&) = delete;
+    
+    ArrayPtr& operator=(ArrayPtr&& other) {
+        raw_ptr_ = move(other.Get());
+    }
+
 
     // Прекращает владением массивом в памяти, возвращает значение адреса массива
     // После вызова метода указатель на массив должен обнулиться
