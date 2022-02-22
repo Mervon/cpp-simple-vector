@@ -120,7 +120,7 @@ public:
             {
                 size_t new_capacity = std::max(new_size, capacity_ * 2);
                 ArrayPtr<Type> tmp_array{new_capacity};
-                std::copy(std::make_move_iterator(this->begin()), std::make_move_iterator(this->end()), tmp_array.Get());      
+                std::copy(std::make_move_iterator(begin()), std::make_move_iterator(end()), tmp_array.Get());      
                 for (auto it = tmp_array.Get() + size_; it != tmp_array.Get() + new_size; ++ it) {
                     *it = std::move(Type{});
                 }
@@ -169,24 +169,16 @@ public:
     }
     
     SimpleVector(const SimpleVector& other) {
-        
         SimpleVector<Type> tmp(other.GetSize());
-
-        std::copy(other.begin(), other.end(), tmp.begin());
-        
+        std::copy(other.begin(), other.end(), tmp.begin());    
         swap(tmp);
     }
 
-    SimpleVector(SimpleVector&& other) {  
-    Reserve(other.GetSize()); 
-    size_ = other.GetSize();
-    
-    std::move_backward(std::make_move_iterator(other.begin()), std::make_move_iterator(other.end()), end()); //по факту без временного вектора мы не обошлись, он создался в методе Reserve() в 181 строке, так что здесь идентичное кол-во созданий нового вектора, да и std::move_backward всё что делает так это проходится по итераторам от начала и до конца в точно таком же цикле что был раньше, и еденственное что мы получили с этого нововведения - это читабельность кода (было 3 строки, а стало 1), или быть может я что то не правильно понимаю?
-
-    while (other.GetSize() != 0) {
-        other.PopBack();
+    SimpleVector(SimpleVector&& other) {   
+        array_.swap(other.array_);
+        other.capacity_ = std::exchange(capacity_, other.capacity_);
+        other.size_ = std::exchange(size_, other.size_);
     }
-}
 
     SimpleVector& operator=(const SimpleVector& rhs) {
         if (this != &rhs) {
@@ -202,7 +194,7 @@ public:
         if (size_ == capacity_) {
             size_t new_capacity = std::max(static_cast<size_t>(1), capacity_ * 2);
             ArrayPtr<Type> tmp_array{new_capacity};
-            std::copy(this->begin(), this->end(), tmp_array.Get());
+            std::copy(begin(), end(), tmp_array.Get());
             tmp_array[size_] = item;
             array_.swap(tmp_array);
             capacity_ = new_capacity;
@@ -216,7 +208,7 @@ public:
         if (size_ == capacity_) {
             size_t new_capacity = std::max(static_cast<size_t>(1), capacity_ * 2);
             ArrayPtr<Type> tmp_array{new_capacity};
-            std::move(std::make_move_iterator(this->begin()), std::make_move_iterator(this->end()), tmp_array.Get());
+            std::move(std::make_move_iterator(begin()), std::make_move_iterator(end()), tmp_array.Get());
             tmp_array[size_] = std::move(item);
             array_.swap(tmp_array);
             capacity_ = new_capacity;
@@ -231,8 +223,8 @@ public:
     // Если перед вставкой значения вектор был заполнен полностью,
     // вместимость вектора должна увеличиться вдвое, а для вектора вместимостью 0 стать равной 1
     Iterator Insert(ConstIterator pos, const Type& value) {
+    	assert(Iterator(pos) <= end() && Iterator(pos) >= begin());
         size_t pos_size_t = std::distance(begin(), Iterator(pos));
-        assert(pos_size_t <= size_);
         auto pos_size_t_end = std::distance(begin(), end());
         if (size_ == capacity_) {
             if (size_ == 0) {
@@ -259,8 +251,8 @@ public:
     }
     
     Iterator Insert(ConstIterator pos, Type&& value) {
+    	assert(Iterator(pos) <= end() && Iterator(pos) >= begin());
         size_t pos_size_t = std::distance(begin(), Iterator(pos));
-        assert(pos_size_t <= size_);
         auto pos_size_t_end = std::distance(begin(), end());
         if (size_ == capacity_) {
             if (size_ == 0) {
@@ -293,20 +285,20 @@ public:
 
     // "Удаляет" последний элемент вектора. Вектор не должен быть пустым
     void PopBack() noexcept {
-        assert(size_ != 0);
+        assert(!IsEmpty());
         --size_;
     }
 
     // Удаляет элемент вектора в указанной позиции
     Iterator Erase(ConstIterator pos) {
-        size_t pos_size_t = pos - this->begin();
-        assert(pos_size_t <= size_);
-        size_t end = this->end() - this->begin();
+    	assert(Iterator(pos) <= end() && Iterator(pos) >= begin());
+        size_t pos_size_t = pos - begin();
+        size_t end = this->end() - begin();
         for (; (pos_size_t + 1) != end; ++pos_size_t) {
             array_[pos_size_t] = std::move(array_[pos_size_t + 1]);
         }
         --size_;
-        return &array_[pos - this->begin()];
+        return &array_[pos - begin()];
     }
 
     // Обменивает значение с другим вектором
@@ -369,7 +361,7 @@ inline bool operator>(const SimpleVector<Type>& lhs, const SimpleVector<Type>& r
     return (std::lexicographical_compare(rhs.begin(), rhs.end(), lhs.begin(), lhs.end()));
 }
 
-template <typename Type>
+    template <typename Type>
 inline bool operator>=(const SimpleVector<Type>& lhs, const SimpleVector<Type>& rhs) {
     return !(std::lexicographical_compare(lhs.begin(), lhs.end(), rhs.begin(), rhs.end()));
 } 
