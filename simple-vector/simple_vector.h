@@ -200,31 +200,13 @@ public:
     // При нехватке места увеличивает вдвое вместимость вектора
     void PushBack(const Type& item) {
         if (size_ == capacity_) {
-            if (capacity_ == 0) {
-                
-                size_t new_capacity = 1;
-                ArrayPtr<Type> tmp_array{new_capacity};
-                
-                std::copy(this->begin(), this->end(), tmp_array.Get());
-                
-                tmp_array[size_] = item;
-                
-                array_.swap(tmp_array);
-                capacity_ = new_capacity;
-                ++size_;
-            } else {
-                
-                size_t new_capacity = capacity_ * 2;
-                ArrayPtr<Type> tmp_array{new_capacity};
-                
-                std::copy(this->begin(), this->end(), tmp_array.Get());
-                
-                tmp_array[size_] = item;
-                
-                array_.swap(tmp_array);
-                capacity_ = new_capacity;
-                ++size_;
-            }
+            size_t new_capacity = std::max(static_cast<size_t>(1), capacity_ * 2);
+            ArrayPtr<Type> tmp_array{new_capacity};
+            std::copy(this->begin(), this->end(), tmp_array.Get());
+            tmp_array[size_] = item;
+            array_.swap(tmp_array);
+            capacity_ = new_capacity;
+            ++size_;
         } else {
             array_[size_++] = item;
         }
@@ -232,36 +214,13 @@ public:
     
     void PushBack(Type&& item) {
         if (size_ == capacity_) {
-            if (capacity_ == 0) {
-                
-                size_t new_capacity = 1;
-                ArrayPtr<Type> tmp_array{new_capacity};
-                
-                //std::copy(std::make_move_iterator(this->begin()), std::make_move_iterator(this->end()), tmp_array.Get());
-                
-                int count = 0;
-                for (auto it = begin(); it != end(); ++it) {
-                    tmp_array[count++] = std::move(*it);
-                }
-                
-                tmp_array[size_] = std::move(item);
-                
-                array_.swap(tmp_array);
-                capacity_ = new_capacity;
-                ++size_;
-            } else {
-                
-                size_t new_capacity = capacity_ * 2;
-                ArrayPtr<Type> tmp_array{new_capacity};
-                
-                std::copy(std::make_move_iterator(this->begin()), std::make_move_iterator(this->end()), tmp_array.Get());
-                
-                tmp_array[size_] = std::move(item);
-                
-                array_.swap(tmp_array);
-                capacity_ = new_capacity;
-                ++size_;
-            }
+            size_t new_capacity = std::max(static_cast<size_t>(1), capacity_ * 2);
+            ArrayPtr<Type> tmp_array{new_capacity};
+            std::move(std::make_move_iterator(this->begin()), std::make_move_iterator(this->end()), tmp_array.Get());
+            tmp_array[size_] = std::move(item);
+            array_.swap(tmp_array);
+            capacity_ = new_capacity;
+            ++size_;
         } else {
             array_[size_++] = std::move(item);
         }
